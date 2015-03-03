@@ -1,0 +1,48 @@
+{
+  "name": "pWinStatusBlinkStick",
+  "description": "Show CPU usage and network connectivity status through blinkstick",
+  "keywords": [
+    "Windows",
+    "CPU",
+    "CPU Usage",
+    "Processor",
+    "Processor usage",
+    "Network",
+    "Network lag",
+    "Network latency",
+    "Network lag",
+    "Network failure",
+    "Status",
+    "BlinkStick"
+  ],
+  "version": "0.0.1",
+  "author": {
+    "name": "SkyLined",
+    "email": "berendjanwever@gmail.com",
+    "url": "https://github.com/SkyLined"
+  },
+  "bugs": {
+    "url": "https://github.com/SkyLined/pWinStatusBlinkStick/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/SkyLined/pWinStatusBlinkStick"
+  },
+  "dependencies": {
+    "blinkstick": ">=0.1.0",
+    "cwinperfcounter": ">=0.0.13",
+    "foparsearguments": ">=0.0.5"
+  },
+  "main": "./index.js",
+  "engines": {
+    "node": ">=0.10.0"
+  },
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "ia32",
+    "x64"
+  ],
+  "license": "CC0-1.0"
+}
