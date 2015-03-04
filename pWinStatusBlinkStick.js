@@ -2,11 +2,11 @@
 var bCPUConsoleOutput =                 false;
 var bNetConsoleOutput =                 false;
 var bBlinkStickConsoleOutput =          false;
-var foParseArguments = require("../foParseArguments");
+var foParseArguments = require("foParseArguments");
 var oArguments = foParseArguments({
   "adxParameters": [
     {
-      "sName": "serial-numbers",
+      "sName": "serial-number",
       "sTypeDescription": "string",
       "auRepeat": [0, Infinity],
       "sHelpText": "Serial numbers of BlinkSticks to use",
@@ -15,6 +15,9 @@ var oArguments = foParseArguments({
   "dxSwitches": {
     "dioder": {
       "sHelpText": "Inverse BlinkStick colors for use with an IKEA dioder",
+    },
+    "show-serials": {
+      "sHelpText": "Output the serial numbers of all selected BlinkSticks",
     },
   },
   "dxOptions": {
@@ -61,7 +64,6 @@ var oArguments = foParseArguments({
   }
 });
 if (!oArguments) process.exit();
-var bDioder =                     oArguments.dbSwitches["dioder"];
 var nCPUPollingInterval =         oArguments.dxOptions["cpu-polling"];
 var nCPUAverageInterval =         oArguments.dxOptions["cpu-average"];
 var nCPUIdleHeartBeatInterval =   oArguments.dxOptions["cpu-heartbeat"][0];
@@ -70,6 +72,8 @@ var nNetInterval =                oArguments.dxOptions["net-polling"];
 var nNetTimeout =                 oArguments.dxOptions["net-timeout"];
 var nNetAverageInterval =         oArguments.dxOptions["net-average"];
 var sNetTargetUrl =               oArguments.dxOptions["net-url"];
+var bBlinkStickDioder =           oArguments.dbSwitches["dioder"];
+var bBlinkStickShowSerials =      oArguments.dbSwitches["show-serials"];
 var nBlinkStickRefreshInterval =  oArguments.dxOptions["framerate"];
 var asBlinkStickSerialNumbers =   oArguments.dxParameters["serial-numbers"];
 // --- Gather CPU usage data ---------------------------------------------------
@@ -145,33 +149,41 @@ setInterval(function () {
   }
 }, nNetInterval);
 // --- Update BlinkStick colors ------------------------------------------------
-var mBlinkStick = require('BlinkStick'),
+var mBlinkStick = require("BlinkStick"),
     aoBlinkSticks = mBlinkStick.findAll();
 if (asBlinkStickSerialNumbers) {
-  var uSerialsRetreived = 0;
+  var asFoundSerialNumbers = [];
   var aoAllBlinkSticks = aoBlinkSticks;
   aoBlinkSticks = [];
   aoAllBlinkSticks.forEach(function (oBlinkStick) {
-    oBlinkStick.getSerial(function (oError, sSerial) {
+    oBlinkStick.getSerial(function (oError, sSerialNumber) {
       if (oError) throw oError;
-      var uIndex = asBlinkStickSerialNumbers.indexOf(sSerial);
+      var uIndex = asBlinkStickSerialNumbers.indexOf(sSerialNumber);
       if (uIndex != -1) {
         aoBlinkSticks.push(oBlinkStick);
         asBlinkStickSerialNumbers.splice(uIndex, 1);
       }
-      if (++uSerialsRetreived == aoAllBlinkSticks.length) {
-        if (aoBlinkSticks.length == 0) {
-          console.log("Cannot find any BlinkSticks");
-          process.exit(1);
-        }
+      asFoundSerialNumbers.push(sSerialNumber);
+      if (asFoundSerialNumbers.length == aoAllBlinkSticks.length) {
         if (asBlinkStickSerialNumbers.length) {
-          if (asBlinkStickSerialNumbers.length == 1) {
-            console.log("Cannot find BlinkStick with serial number " + asBlinkStickSerialNumbers[0]);
-          } else {
-            console.log("Cannot find BlinkStick with serial numbers " + asBlinkStickSerialNumbers.join(", "));
-          }
+          console.log("Cannot find BlinkStick with serial numbers " + asBlinkStickSerialNumbers.join(", "));
           process.exit(1);
         }
+        if (bBlinkStickShowSerials) {
+          console.log("Serial numbers: " + asFoundSerialNumbers.join(", "));
+        }
+        startBlinkSticks();
+      }
+    });
+  });
+} else if (bBlinkStickShowSerials) {
+  var asFoundSerialNumbers = [];
+  aoBlinkSticks.forEach(function (oBlinkStick) {
+    oBlinkStick.getSerial(function (oError, sSerialNumber) {
+      if (oError) throw oError;
+      asFoundSerialNumbers.push(sSerialNumber);
+      if (asFoundSerialNumbers.length == aoBlinkSticks.length) {
+        console.log("Serial numbers: " + asFoundSerialNumbers.join(", "));
         startBlinkSticks();
       }
     });
@@ -184,12 +196,12 @@ function startBlinkSticks() {
     console.log("Cannot find any BlinkSticks");
     process.exit(1);
   }
-  if (bDioder) {
+  if (bBlinkStickDioder) {
     aoBlinkSticks.forEach(function(oBlinkStick) {
       oBlinkStick.setInverse(true);
     });
   }
-  var cRGBA = require("../cRGBA");
+  var mColor = require("mColor");
   var nLastBlinkStickTime = new Date().valueOf();
   var nHeartBeatCounter = 0;
   setInterval(function () {
@@ -203,19 +215,25 @@ function startBlinkSticks() {
     bBlinkStickConsoleOutput && console.log("nHeartBeatCounter = " + nHeartBeatCounter);
     var nHeartBeat = 1 + 0.5 * Math.sin(nHeartBeatCounter * Math.PI * 2);
     bBlinkStickConsoleOutput && console.log("nHeartBeat = " + nHeartBeat);
-    var nCPUOpacity = (
-        0.3 * nHeartBeat +
-        (nAverageCPUUsage === undefined ? 0.4 : 0.4 * nAverageCPUUsage)
-    );
-    bBlinkStickConsoleOutput && console.log("nLuminosity = " + nLuminosity);
+    // Hue changes from green to red with higher CPU usage.
     var nHue = (
         nAverageCPUUsage === undefined ? 0 :
         (1 - nAverageCPUUsage * nAverageCPUUsage) / 3
     );
     bBlinkStickConsoleOutput && console.log("nHue = " + nHue);
-    var oCPUColor = new cRGBA.fromHSLA(nHue, 1, 0.5, nCPUOpacity);
-    var oNetworkColor = new cRGBA(0, 0, nNetworkLatency * nNetworkLatency); // blue will override the CPU color if the network fails.
-    var sColor = oNetworkColor.overlay(oCPUColor).hexRGB();
+    // Luminosity changes with heartbeat and increases with higher CPU usage.
+    var nLuminosity = (
+        0.15 * nHeartBeat +
+        (nAverageCPUUsage === undefined ? 0.2 : 0.2 * nAverageCPUUsage)
+    );
+    bBlinkStickConsoleOutput && console.log("nLuminosity = " + nLuminosity);
+    // Blue overrides the color based on the network latency (through opacity)
+    var nBlueOpacity = nNetworkLatency * nNetworkLatency;
+    bBlinkStickConsoleOutput && console.log("nBlueOpacity = " + nBlueOpacity);
+    // Combine Hue and Saturation into color
+    var oNetworkColorRGBA = new mColor.cRGBA(0, 0, 1, 0.8 * nBlueOpacity);
+    var oCPUColorHSLA = new mColor.cHSLA(nHue, 1, nLuminosity);
+    var sColor = oNetworkColorRGBA.foOver(oCPUColorHSLA).sRGB;
     bBlinkStickConsoleOutput && console.log("sColor = " + sColor);
     aoBlinkSticks.forEach(function (oBlinkStick) {
       oBlinkStick.setColor(sColor);
