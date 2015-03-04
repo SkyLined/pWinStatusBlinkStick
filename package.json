@@ -1,6 +1,6 @@
 {
   "name": "pWinStatusBlinkStick",
-  "description": "Show CPU usage and network connectivity status through blinkstick",
+  "description": "Program to show CPU usage and network connectivity status through blinkstick",
   "keywords": [
     "Windows",
     "CPU",
