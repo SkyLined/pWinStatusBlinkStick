@@ -34,7 +34,7 @@
     "foparsearguments": "0.0.x",
     "mcolor": "0.0.x"
   },
-  "main": "./index.js",
+  "main": "./pWinStatusBlinkStick.js",
   "engines": {
     "node": ">=0.10.0"
   },
