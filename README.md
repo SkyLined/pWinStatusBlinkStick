@@ -13,7 +13,7 @@ Getting Started
   
   Optionally: rename `pwinstatusblinkstick` to `pWinStatusBlinkStick`: npm is
   unable to handle the complexity of uppercase characters in a module name.
-  Node on Windows does not have this problem, so renaming the folder is not
+  Node.js on Windows does not have this problem, so renaming the folder is not
   required for you to use the module.
 
 2. Run pWinStatusBlinkStick.
@@ -22,33 +22,59 @@ Getting Started
 
 --------------------------------------------------------------------------------
 
+Help
+-----
+```
+Usage:
+    pWinStatusBlinkStick.js [serial-number [serial-number [...] ] ] [options and switches]
+
+Parameters:
+    serial-number (string)
+        Serial numbers of BlinkSticks to use
+Options:
+    --cpu-polling=uint
+        Interval between CPU usage checks in ms
+        default: 40
+    --cpu-average=uint
+        Interval over which CPU usage is averaged in ms
+        default: 2000
+    --cpu-heartbeat=uint-uint
+        Interval of the "heartbeat" for idle and 100% CPU usage in ms
+        default: [3000,1000]
+    --net-polling=uint
+        Interval between net connection checks in ms
+        default: 100
+    --net-timeout=uint
+        Timeout for net connections in ms
+        default: 500
+    --net-average=uint
+        Interval over which net latency is averaged in ms
+        default: 5000
+    --net-url=string
+        URL to request for net connection tests
+        default: "http://clients3.google.com/generate_204"
+    --framerate=uint
+        Interval between BlinkStick color updates in ms
+        default: 1
+Switches:
+    --dioder
+        Inverse BlinkStick colors for use with an IKEA dioder
+    --show-serials
+        Output the serial numbers of all selected BlinkSticks
+```
+
 Notes
 -----
-### Including cWinPerfCounter in your public module
-
-By default, `npm install` will only build for your processor architecture and
-node version. If you want to include this addon in your node module for others
-to use without requiring them to build cWinPerfCounter, it might be a good idea
-to pre-build it for several common combinations of processor architecture and
-node version.
-
-To make this easier, I added the "build.cmd" script. This will read a list of
-processor architecture and node version combinations from "build-targets.txt"
-and build a cWinPerfCounter.node file for each. These files are stored in
-separate sub-folders of the "addon" folder, and the "addon/index.js" attempts
-to load the correct ".node" file for the user's node installation.
-
-### How to find out what performance counters are available
-
-You can either search the web, or you can run "perfmon.exe" on your machine and
-follow these steps:
-* open `Performance` -> `Monitoring Tools` -> `Performance Monitor`,
-* right-click on the graph and select "Add Counters...",
-* select and add the counters you are interested in, then click "Ok".
-* right-click the graph again and select "Properties...",
-* in the "Data" tab, you will see a list of the names of the performance
-  counters you have selected. You should be able to use these names with
-  cWinPerfCounter.
+You may be interested in `pBackground`, which will allow you to run a Node.js
+script such as pWinStatusBlinkStick in the background, without a console.
+  ```
+  C:\>npm install pbackground -g
+  ...
+  C:\>node-bkg pWinStatusBlinkStick
+  ```
+You can add a link to `node-bkg pWinStatusBlinkStick` to the Startup folder in
+the start menu to run the script in the background as soon as you log into your
+computer.
 
 --------------------------------------------------------------------------------
 
