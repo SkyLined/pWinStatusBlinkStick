@@ -29,10 +29,10 @@
     "url": "git://github.com/SkyLined/pWinStatusBlinkStick"
   },
   "dependencies": {
-    "blinkstick": ">=0.1.0",
-    "cwinperfcounter": ">=0.0.13",
-    "foparsearguments": ">=0.0.7",
-    "mcolor": ">=0.0.2"
+    "blinkstick": "0.1.x",
+    "cwinperfcounter": "0.0.x",
+    "foparsearguments": "0.0.x",
+    "mcolor": "0.0.x"
   },
   "main": "./index.js",
   "engines": {
