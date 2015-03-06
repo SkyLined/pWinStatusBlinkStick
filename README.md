@@ -65,8 +65,9 @@ Switches:
 
 Notes
 -----
-You may be interested in `pBackground`, which will allow you to run a Node.js
-script such as pWinStatusBlinkStick in the background, without a console.
+You may be interested in [pBackground](https://www.npmjs.com/package/pbackground),
+which will allow you to run a Node.js script such as pWinStatusBlinkStick in the
+background, without a console.
   ```
   C:\>npm install pbackground -g
   ...
