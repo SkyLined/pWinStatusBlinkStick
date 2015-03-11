@@ -56,11 +56,6 @@ var oArguments = foParseArguments({
       "sHelpText": "URL to request for net connection tests",
       "xDefaultValue": "http://clients3.google.com/generate_204",
     },
-    "framerate": {
-      "sTypeDescription": "uint",
-      "sHelpText": "Interval between BlinkStick color updates in ms",
-      "xDefaultValue": 1,
-    },
     "night-time-brightness": {
       "sTypeDescription": "float01",
       "sHelpText": "Night time brightness as compared to day time brightness",
@@ -79,7 +74,6 @@ var nNetAverageInterval =         oArguments.dxOptions["net-average"];
 var sNetTargetUrl =               oArguments.dxOptions["net-url"];
 var bBlinkStickDioder =           oArguments.dbSwitches["dioder"];
 var bBlinkStickShowSerials =      oArguments.dbSwitches["show-serials"];
-var nBlinkStickRefreshInterval =  oArguments.dxOptions["framerate"];
 var asBlinkStickSerialNumbers =   oArguments.dxParameters["serial-numbers"];
 var nNightTimeBrightness =        oArguments.dxOptions["night-time-brightness"];
 // --- Gather CPU usage data ---------------------------------------------------
@@ -156,6 +150,7 @@ setInterval(function () {
 }, nNetInterval);
 // --- Update BlinkStick colors ------------------------------------------------
 var mBlinkStick = require("BlinkStick"),
+    mColor = require("mColor"),
     aoBlinkSticks = mBlinkStick.findAll();
 if (asBlinkStickSerialNumbers) {
   var asFoundSerialNumbers = [];
@@ -198,6 +193,10 @@ if (asBlinkStickSerialNumbers) {
   switchBlinkStickModes();
 }
 function switchBlinkStickModes() {
+  if (aoBlinkSticks.length == 0) {
+    console.log("Cannot find any BlinkSticks");
+    process.exit(1);
+  }
   var uModesSwitched = 0;
   aoBlinkSticks.forEach(function(oBlinkStick) {
     oBlinkStick.setMode(bBlinkStickDioder ? 1 : 0, function () {
@@ -207,67 +206,78 @@ function switchBlinkStickModes() {
     });
   });
 }
+var nLastBlinkStickTime, nHeartBeatCounter;
 function startBlinkSticks() {
-  if (aoBlinkSticks.length == 0) {
-    console.log("Cannot find any BlinkSticks");
-    process.exit(1);
-  }
-  aoBlinkSticks.forEach(function(oBlinkStick) {
-    oBlinkStick.setColor("#000000");
-  });
-  var mColor = require("mColor");
-  var nLastBlinkStickTime = new Date().valueOf();
-  var nHeartBeatCounter = 0;
-  setInterval(function () {
-    var nCurrentTime = new Date().valueOf();
-    var nActualBlinkStickInterval = nCurrentTime - nLastBlinkStickTime;
-    nLastBlinkStickTime = nCurrentTime;
-    bBlinkStickConsoleOutput && console.log("nActualBlinkStickInterval = " + nActualBlinkStickInterval);
-    var nHeartBeatInterval = nCPUIdleHeartBeatInterval + (nCPUBusyHeartBeatInterval - nCPUIdleHeartBeatInterval) * nAverageCPUUsage;
-    bBlinkStickConsoleOutput && console.log("nHeartBeatInterval = " + nHeartBeatInterval);
-    nHeartBeatCounter += nActualBlinkStickInterval / nHeartBeatInterval;
-    bBlinkStickConsoleOutput && console.log("nHeartBeatCounter = " + nHeartBeatCounter);
-    var nHeartBeat = 1 - 0.5 * Math.cos(nHeartBeatCounter * Math.PI * 2); // start at 0
-    bBlinkStickConsoleOutput && console.log("nHeartBeat = " + nHeartBeat);
-    // Hue changes from green to red with higher CPU usage.
-    var nHue = (
-        nAverageCPUUsage === undefined ? 0 :
-        (1 - nAverageCPUUsage * nAverageCPUUsage) / 3
-    );
-    bBlinkStickConsoleOutput && console.log("nHue = " + nHue);
-    // Luminosity changes with heartbeat and increases with higher CPU usage.
-    var nLuminosity = (
-        0.15 * nHeartBeat +
-        (nAverageCPUUsage === undefined ? 0.2 : 0.2 * nAverageCPUUsage)
-    );
-    bBlinkStickConsoleOutput && console.log("nLuminosity = " + nLuminosity);
-    // Blue overrides the color based on the network latency (through opacity)
-    var nBlueOpacity = nNetworkLatency * nNetworkLatency;
-    bBlinkStickConsoleOutput && console.log("nBlueOpacity = " + nBlueOpacity);
-    // Combine Hue and Saturation into color
-    var oNetworkColorHSLA = new mColor.cHSLA(2/3, 1, 0.5, 0.8 * nBlueOpacity);
-    var oCPUColorHSLA = new mColor.cHSLA(nHue, 1, nLuminosity);
-    var oColorHSLA = oNetworkColorHSLA.foOver(oCPUColorHSLA);
-    var oDate = new Date();
-    // Get a number that goes from 0 - 2 PI based on the time of day (0 and 2 PI are midnight.
-    var nTimeIndex =  Math.PI * 2 * ((oDate.getSeconds() / 60 + oDate.getMinutes()) / 60 + oDate.getHours()) / 24;
-    // Use it to create a sine like value that goes to 0 around midday and goes up to 1 at midnight.
-    // It's slightly more complex than a simple sin to make it look slightly more like a square wave.
-    var nNightTimeMultiplier = Math.max(0, Math.min(1, (1 + Math.cos(nTimeIndex) + Math.cos(nTimeIndex) * (Math.cos(nTimeIndex * 4 + Math.PI) + 1) / 10) / 2));
-    // Use the sine-line value to determine the final brightness.
-    oColorHSLA.nL *= 1 + (nNightTimeBrightness - 1) * nNightTimeMultiplier;
-    bBlinkStickConsoleOutput && console.log("sColorRGB = " + sColorRGB);
-    aoBlinkSticks.forEach(function (oBlinkStick) {
-      oBlinkStick.setColor(oColorHSLA.foGetRGBA().sRGB);
+  nLastBlinkStickTime = new Date().valueOf();
+  nHeartBeatCounter = 0;
+  setBlinkSticksColor(0, "#000000", function () {
+    process.on("SIGINT", function () {
+      setBlinkSticksColor(0, "#000000", function () {
+        process.exit();
+      });
     });
-  }, nBlinkStickRefreshInterval);
-  process.on("SIGINT", function () {
-    aoBlinkSticks.forEach(function (oBlinkStick) {
-      oBlinkStick.setColor("#000000");
-    });
-    process.exit();
+    updateBlinkSticks();
   });
 }
+function updateBlinkSticks() {
+  var nCurrentTime = new Date().valueOf();
+  var nActualBlinkStickInterval = nCurrentTime - nLastBlinkStickTime;
+  nLastBlinkStickTime = nCurrentTime;
+  bBlinkStickConsoleOutput && console.log("nActualBlinkStickInterval = " + nActualBlinkStickInterval);
+  var nHeartBeatInterval = nCPUIdleHeartBeatInterval + (nCPUBusyHeartBeatInterval - nCPUIdleHeartBeatInterval) * nAverageCPUUsage;
+  bBlinkStickConsoleOutput && console.log("nHeartBeatInterval = " + nHeartBeatInterval);
+  nHeartBeatCounter += nActualBlinkStickInterval / nHeartBeatInterval;
+  bBlinkStickConsoleOutput && console.log("nHeartBeatCounter = " + nHeartBeatCounter);
+  var nHeartBeat = 1 - 0.5 * Math.cos(nHeartBeatCounter * Math.PI * 2); // start at 0
+  bBlinkStickConsoleOutput && console.log("nHeartBeat = " + nHeartBeat);
+  // Hue changes from green to red with higher CPU usage.
+  var nHue = (
+      nAverageCPUUsage === undefined ? 0 :
+      (1 - nAverageCPUUsage * nAverageCPUUsage) / 3
+  );
+  bBlinkStickConsoleOutput && console.log("nHue = " + nHue);
+  // Luminosity changes with heartbeat and increases with higher CPU usage.
+  var nLuminosity = (
+      0.15 * nHeartBeat +
+      (nAverageCPUUsage === undefined ? 0.2 : 0.2 * nAverageCPUUsage)
+  );
+  bBlinkStickConsoleOutput && console.log("nLuminosity = " + nLuminosity);
+  // Blue overrides the color based on the network latency (through opacity)
+  var nBlueOpacity = nNetworkLatency * nNetworkLatency;
+  bBlinkStickConsoleOutput && console.log("nBlueOpacity = " + nBlueOpacity);
+  // Combine Hue and Saturation into color
+  var oNetworkColorHSLA = new mColor.cHSLA(2/3, 1, 0.5, 0.8 * nBlueOpacity);
+  var oCPUColorHSLA = new mColor.cHSLA(nHue, 1, nLuminosity);
+  var oColorHSLA = oNetworkColorHSLA.foOver(oCPUColorHSLA);
+  var oDate = new Date();
+  // Get a number that goes from 0 - 2 PI based on the time of day (0 and 2 PI are midnight.
+  var nTimeIndex =  Math.PI * 2 * ((oDate.getSeconds() / 60 + oDate.getMinutes()) / 60 + oDate.getHours()) / 24;
+  // Use it to create a sine like value that goes to 0 around midday and goes up to 1 at midnight.
+  // It's slightly more complex than a simple sin to make it look slightly more like a square wave.
+  var nNightTimeMultiplier = Math.max(0, Math.min(1, (1 + Math.cos(nTimeIndex) + Math.cos(nTimeIndex) * (Math.cos(nTimeIndex * 4 + Math.PI) + 1) / 10) / 2));
+  // Use the sine-line value to determine the final brightness.
+  oColorHSLA.nL *= 1 + (nNightTimeBrightness - 1) * nNightTimeMultiplier;
+  var sColorRGB = oColorHSLA.foGetRGBA().sRGB;
+  bBlinkStickConsoleOutput && console.log("sColorRGB = " + sColorRGB);
+  setBlinkSticksColor(0, sColorRGB, function () {
+    setTimeout(updateBlinkSticks, 0);
+    // Timeout because https://forums.blinkstick.com/t/node-js-callbacks-causing-stack-overflow/150
+  });
+};
+var uSequentialErrors = 0;
+function setBlinkSticksColor(uColorsSet, sColor, fCallback) {
+  aoBlinkSticks[uColorsSet].setColor(sColor, function (oError) {
+    if (oError) {
+      if (++uSequentialErrors > 10) throw oError;
+      bBlinkStickConsoleOutput && console.log("Error setting BlinkStick color:", oError);
+      setBlinkSticksColor(uColorsSet, sColor, fCallback); // try again
+    } else if (++uColorsSet == aoBlinkSticks.length) {
+      fCallback(); // done
+    } else {
+      setBlinkSticksColor(uColorsSet, sColor, fCallback); // set next blinkstick
+    }
+  });
+};
 // --- Helper functions --------------------------------------------------------
 function average(anValues) {
   var nAverage = 0;
