@@ -16,6 +16,9 @@ var oArguments = foParseArguments({
     "dioder": {
       "sHelpText": "Inverse BlinkStick colors for use with an IKEA dioder",
     },
+    "multi-led": {
+      "sHelpText": "Set all LEDs attached to a BlinkStick Pro",
+    },
     "show-serials": {
       "sHelpText": "Output the serial numbers of all selected BlinkSticks",
     },
@@ -73,9 +76,14 @@ var nNetTimeout =                 oArguments.dxOptions["net-timeout"];
 var nNetAverageInterval =         oArguments.dxOptions["net-average"];
 var sNetTargetUrl =               oArguments.dxOptions["net-url"];
 var bBlinkStickDioder =           oArguments.dbSwitches["dioder"];
+var bBlinkStickMultiLED =         oArguments.dbSwitches["multi-led"];
 var bBlinkStickShowSerials =      oArguments.dbSwitches["show-serials"];
 var asBlinkStickSerialNumbers =   oArguments.dxParameters["serial-numbers"];
 var nNightTimeBrightness =        oArguments.dxOptions["night-time-brightness"];
+if (bBlinkStickDioder && bBlinkStickMultiLED) {
+  console.log("The --dioder and --multi-led switch are mutually exclusive");
+  process.exit(1);
+}
 // --- Gather CPU usage data ---------------------------------------------------
 var cWinPerfCounter = require("cWinPerfCounter"),
     oPerfCounter = new cWinPerfCounter("\\Processor(_Total)\\% Processor Time");
@@ -151,75 +159,147 @@ setInterval(function () {
 // --- Update BlinkStick colors ------------------------------------------------
 var mBlinkStick = require("BlinkStick"),
     mColor = require("mColor"),
-    aoBlinkSticks = mBlinkStick.findAll();
-if (asBlinkStickSerialNumbers) {
-  var asFoundSerialNumbers = [];
-  var aoAllBlinkSticks = aoBlinkSticks;
-  aoBlinkSticks = [];
-  aoAllBlinkSticks.forEach(function (oBlinkStick) {
-    oBlinkStick.getSerial(function (oError, sSerialNumber) {
-      if (oError) throw oError;
-      var uIndex = asBlinkStickSerialNumbers.indexOf(sSerialNumber);
-      if (uIndex != -1) {
-        aoBlinkSticks.push(oBlinkStick);
-        asBlinkStickSerialNumbers.splice(uIndex, 1);
-      }
-      asFoundSerialNumbers.push(sSerialNumber);
-      if (asFoundSerialNumbers.length == aoAllBlinkSticks.length) {
-        if (asBlinkStickSerialNumbers.length) {
-          console.log("Cannot find BlinkStick with serial numbers " + asBlinkStickSerialNumbers.join(", "));
-          process.exit(1);
-        }
-        if (bBlinkStickShowSerials) {
-          console.log("Serial numbers: " + asFoundSerialNumbers.join(", "));
-        }
-        switchBlinkStickModes();
-      }
-    });
-  });
-} else if (bBlinkStickShowSerials) {
-  var asFoundSerialNumbers = [];
-  aoBlinkSticks.forEach(function (oBlinkStick) {
-    oBlinkStick.getSerial(function (oError, sSerialNumber) {
-      if (oError) throw oError;
-      asFoundSerialNumbers.push(sSerialNumber);
-      if (asFoundSerialNumbers.length == aoBlinkSticks.length) {
-        console.log("Serial numbers: " + asFoundSerialNumbers.join(", "));
-        switchBlinkStickModes();
-      }
-    });
-  });
-} else {
-  switchBlinkStickModes();
-}
-function switchBlinkStickModes() {
-  if (aoBlinkSticks.length == 0) {
-    console.log("Cannot find any BlinkSticks");
-    process.exit(1);
-  }
-  var uModesSwitched = 0;
-  aoBlinkSticks.forEach(function(oBlinkStick) {
-    oBlinkStick.setMode(bBlinkStickDioder ? 1 : 0, function () {
-      if (++uModesSwitched == aoBlinkSticks.length) {
-        startBlinkSticks();
-      }
-    });
-  });
-}
+    aoBlinkSticks = mBlinkStick.findAll(),
+    uSequentialBlinkStickErrors = 0;
+if (aoBlinkSticks.length == 0) {
+  console.log("Cannot find any BlinkSticks");
+  process.exit(1);
+};
 var nLastBlinkStickTime, nHeartBeatCounter;
-function startBlinkSticks() {
-  nLastBlinkStickTime = new Date().valueOf();
-  nHeartBeatCounter = 0;
-  setBlinkSticksColor(0, "#000000", function () {
-    process.on("SIGINT", function () {
-      setBlinkSticksColor(0, "#000000", function () {
-        process.exit();
-      });
+fGetBlinkStickSerialNumbers(aoBlinkSticks, function (doBlinkStick_by_sSerialNumber) {
+  // If needed, create a copy of doBlinkStick_by_sSerialNumber with only the requested BlinkSticks
+  if (asBlinkStickSerialNumbers) {
+    var doAllBlinkStick_by_sSerialNumber = doBlinkStick_by_sSerialNumber;
+    doBlinkStick_by_sSerialNumber = {};
+    asBlinkStickSerialNumbers.forEach(function (sSerialNumber) {
+      var oBlinkStick = doBlinkStick_by_sSerialNumber[sSerialNumber];
+      if (!oBlinkStick) throw new Error("Cannot find blink stick with serial number " + sSerialNumber);
+      doBlinkStick_by_sSerialNumber[sSerialNumber] = oBlinkStick;
     });
-    updateBlinkSticks();
+  };
+  // If needed, show the serial numbers of (selected) BlinkSticks
+  if (bBlinkStickShowSerials) {
+    console.log("Serial numbers: " + Object.keys(doBlinkStick_by_sSerialNumber).join(", "));
+  };
+  // Done with serial numbers: turn dictionary back into array
+  aoBlinkSticks = []
+  for (var sSerialNumber in doBlinkStick_by_sSerialNumber) {
+    aoBlinkSticks.push(doBlinkStick_by_sSerialNumber[sSerialNumber]);
+  }
+  fSwitchBlinkStickModes(aoBlinkSticks, function () {
+    nLastBlinkStickTime = new Date().valueOf();
+    nHeartBeatCounter = 0;
+    var oBlack = mColor.cRGBA(0,0,0);
+    fSetBlinkStickColors(aoBlinkSticks, oBlack, function () {
+      process.on("SIGINT", function () {
+        fSetBlinkStickColors(aoBlinkSticks, oBlack, function () {
+          process.exit();
+        });
+      });
+      fUpdateBlinkSticks();
+    });
   });
-}
-function updateBlinkSticks() {
+});
+
+
+function fGetBlinkStickSerialNumbers(aoBlinkSticks, fCallback) {
+  // callback args: doBlinkStick_by_sSerialNumber
+  var uBlinkStickIndex = 0;
+  doBlinkStick_by_sSerialNumber = {};
+  fGetBlinkStickSerialNumbersHelper();
+  function fGetBlinkStickSerialNumbersHelper() {
+    aoBlinkSticks[uBlinkStickIndex].getSerial(function (oError, sSerialNumber) {
+      if (oError) {
+        if (++uSequentialBlinkStickErrors > 10) throw oError;
+        fGetBlinkStickSerialNumbersHelper(); // try again
+      } else {
+        uSequentialBlinkStickErrors = 0;
+        doBlinkStick_by_sSerialNumber[sSerialNumber] = aoBlinkSticks[uBlinkStickIndex];
+        if (++uBlinkStickIndex < aoBlinkSticks.length) {
+          fGetBlinkStickSerialNumbersHelper(); // next
+        } else {
+          fCallback(doBlinkStick_by_sSerialNumber); //done
+        };
+      };
+    });
+  };
+};
+
+function fSwitchBlinkStickModes(aoBlinkSticks, fCallback) {
+  var uBlinkStickIndex = 0;
+  var uMode = (
+    bBlinkStickDioder ? 1 :
+    bBlinkStickMultiLED ? 2 :
+    0
+  )
+  fSwitchBlinkStickModesHelper();
+  function fSwitchBlinkStickModesHelper() {
+    aoBlinkSticks[uBlinkStickIndex].setMode(uMode, function (oError) {
+      if (oError) {
+        if (++uSequentialBlinkStickErrors > 10) throw oError;
+        fSwitchBlinkStickModesHelper(); // try again
+      } else {
+        uSequentialBlinkStickErrors = 0;
+        if (++uBlinkStickIndex < aoBlinkSticks.length) {
+          fSwitchBlinkStickModesHelper(); // next
+        } else {
+          fCallback(); // done
+        };
+      };
+    });
+  };
+};
+
+function fSetBlinkStickColors(aoBlinkSticks, oColor, fCallback) {
+  var uBlinkStickIndex = 0;
+  if (bBlinkStickMultiLED) {
+    var auColors = [];
+    for (var uIndex = 0; uIndex < 64; uIndex++) {
+      auColors.push(oColor.uG, oColor.uR, oColor.uB); // GRB not RGB!
+    }
+    var uChannelIndex = 0;
+    fSetBlinkStickMultiLEDColorsHelper();
+    function fSetBlinkStickMultiLEDColorsHelper() {
+      aoBlinkSticks[uBlinkStickIndex].setColors(uChannelIndex, auColors, function (oError) {
+        if (oError) {
+          if (++uSequentialBlinkStickErrors > 10) throw oError;
+          bBlinkStickConsoleOutput && console.log("Error setting BlinkStick color:", oError);
+          fSetBlinkStickMultiLEDColorsHelper(); // try again
+        } else {
+          uSequentialBlinkStickErrors = 0;
+          if (++uChannelIndex < 3) {
+            fSetBlinkStickMultiLEDColorsHelper(); // next channel;
+          } else if (++uBlinkStickIndex < aoBlinkSticks.length) {
+            uChannelIndex = 0;
+            fSetBlinkStickMultiLEDColorsHelper(); // next BlinkStick
+          } else {
+            fCallback(); // done
+          };
+        };
+      });
+    };
+  } else {
+    fSetBlinkStickColorsHelper();
+    function fSetBlinkStickColorsHelper() {
+      aoBlinkSticks[uBlinkStickIndex].setColor(oColor.sRGB, function (oError) {
+        if (oError) {
+          if (++uSequentialBlinkStickErrors > 10) throw oError;
+          bBlinkStickConsoleOutput && console.log("Error setting BlinkStick color:", oError);
+          fSetBlinkStickColorsHelper(); // try again
+        } else {
+          uSequentialBlinkStickErrors = 0;
+          if (++uBlinkStickIndex < aoBlinkSticks.length) {
+            fSetBlinkStickColorsHelper(); // next
+          } else {
+            fCallback(); // done
+          };
+        };
+      });
+    };
+  }
+};
+
+function fUpdateBlinkSticks() {
   var nCurrentTime = new Date().valueOf();
   var nActualBlinkStickInterval = nCurrentTime - nLastBlinkStickTime;
   nLastBlinkStickTime = nCurrentTime;
@@ -257,25 +337,11 @@ function updateBlinkSticks() {
   var nNightTimeMultiplier = Math.max(0, Math.min(1, (1 + Math.cos(nTimeIndex) + Math.cos(nTimeIndex) * (Math.cos(nTimeIndex * 4 + Math.PI) + 1) / 10) / 2));
   // Use the sine-line value to determine the final brightness.
   oColorHSLA.nL *= 1 + (nNightTimeBrightness - 1) * nNightTimeMultiplier;
-  var sColorRGB = oColorHSLA.foGetRGBA().sRGB;
-  bBlinkStickConsoleOutput && console.log("sColorRGB = " + sColorRGB);
-  setBlinkSticksColor(0, sColorRGB, function () {
-    setTimeout(updateBlinkSticks, 0);
+  var oColorRGBA = oColorHSLA.foGetRGBA();
+  bBlinkStickConsoleOutput && console.log("oColorRGBA = " + oColorRGBA.sRGB);
+  fSetBlinkStickColors(aoBlinkSticks, oColorRGBA, function () {
+    fUpdateBlinkSticks();
     // Timeout because https://forums.blinkstick.com/t/node-js-callbacks-causing-stack-overflow/150
-  });
-};
-var uSequentialErrors = 0;
-function setBlinkSticksColor(uColorsSet, sColor, fCallback) {
-  aoBlinkSticks[uColorsSet].setColor(sColor, function (oError) {
-    if (oError) {
-      if (++uSequentialErrors > 10) throw oError;
-      bBlinkStickConsoleOutput && console.log("Error setting BlinkStick color:", oError);
-      setBlinkSticksColor(uColorsSet, sColor, fCallback); // try again
-    } else if (++uColorsSet == aoBlinkSticks.length) {
-      fCallback(); // done
-    } else {
-      setBlinkSticksColor(uColorsSet, sColor, fCallback); // set next blinkstick
-    }
   });
 };
 // --- Helper functions --------------------------------------------------------
