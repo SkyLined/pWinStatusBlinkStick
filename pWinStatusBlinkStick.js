@@ -178,7 +178,7 @@ if (asBlinkStickSerialNumbers) {
         if (bBlinkStickShowSerials) {
           console.log("Serial numbers: " + asFoundSerialNumbers.join(", "));
         }
-        startBlinkSticks();
+        switchBlinkStickModes();
       }
     });
   });
@@ -190,22 +190,27 @@ if (asBlinkStickSerialNumbers) {
       asFoundSerialNumbers.push(sSerialNumber);
       if (asFoundSerialNumbers.length == aoBlinkSticks.length) {
         console.log("Serial numbers: " + asFoundSerialNumbers.join(", "));
-        startBlinkSticks();
+        switchBlinkStickModes();
       }
     });
   });
 } else {
-  startBlinkSticks();
+  switchBlinkStickModes();
+}
+function switchBlinkStickModes() {
+  var uModesSwitched = 0;
+  aoBlinkSticks.forEach(function(oBlinkStick) {
+    oBlinkStick.setMode(bBlinkStickDioder ? 1 : 0, function () {
+      if (++uModesSwitched == aoBlinkSticks.length) {
+        startBlinkSticks();
+      }
+    });
+  });
 }
 function startBlinkSticks() {
   if (aoBlinkSticks.length == 0) {
     console.log("Cannot find any BlinkSticks");
     process.exit(1);
-  }
-  if (bBlinkStickDioder) {
-    aoBlinkSticks.forEach(function(oBlinkStick) {
-      oBlinkStick.setInverse(true);
-    });
   }
   aoBlinkSticks.forEach(function(oBlinkStick) {
     oBlinkStick.setColor("#000000");
