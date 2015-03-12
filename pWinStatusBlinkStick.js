@@ -189,7 +189,7 @@ fGetBlinkStickSerialNumbers(aoBlinkSticks, function (doBlinkStick_by_sSerialNumb
   fSwitchBlinkStickModes(aoBlinkSticks, function () {
     nLastBlinkStickTime = new Date().valueOf();
     nHeartBeatCounter = 0;
-    var oBlack = mColor.cRGBA(0,0,0);
+    var oBlack = mColor.cRGBA("black");
     fSetBlinkStickColors(aoBlinkSticks, oBlack, function () {
       process.on("SIGINT", function () {
         fSetBlinkStickColors(aoBlinkSticks, oBlack, function () {
