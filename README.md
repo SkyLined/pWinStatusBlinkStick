@@ -32,33 +32,42 @@ Parameters:
     serial-number (string)
         Serial numbers of BlinkSticks to use
 Options:
-    --cpu-polling=uint
-        Interval between CPU usage checks in ms
-        default: 40
     --cpu-average=uint
         Interval over which CPU usage is averaged in ms
         default: 2000
     --cpu-heartbeat=uint-uint
         Interval of the "heartbeat" for idle and 100% CPU usage in ms
         default: [3000,1000]
+    --cpu-polling=uint
+        Interval between CPU usage checks in ms
+        default: 40
+    --frame-rate=uint
+        Interval between BlinkStick color updates in ms
+        default: 41
+    --net-average=uint
+        Interval over which net latency is averaged in ms
+        default: 5000
     --net-polling=uint
         Interval between net connection checks in ms
         default: 100
     --net-timeout=uint
         Timeout for net connections in ms
         default: 500
-    --net-average=uint
-        Interval over which net latency is averaged in ms
-        default: 5000
     --net-url=string
         URL to request for net connection tests
         default: "http://clients3.google.com/generate_204"
-    --framerate=uint
-        Interval between BlinkStick color updates in ms
-        default: 1
+    --night-time-brightness=float01
+        Night time brightness as compared to day time brightness
+        default: 0.25
 Switches:
-    --dioder
-        Inverse BlinkStick colors for use with an IKEA dioder
+    --dual-led
+        Show CPU usage and Network latency on alternating LEDs (requires WS2812 mode)
+    --mode-inverse
+        Use inverse mode for IKEA dioder attached to BlinkStick Pro
+    --mode-multi-led
+        Use WS2812 mode for multiple LEDs attached to a BlinkStick Pro
+    --mode-normal
+        Use normal mode for single LED attached to BlinkStick/BlinkStick Pro
     --show-serials
         Output the serial numbers of all selected BlinkSticks
 ```
