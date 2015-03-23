@@ -7,6 +7,10 @@ Show CPU usage and network connectivity status through BlinkStick.
 
 Getting Started
 ---------------
+_This will only work with a patched version of the BlinkStick node module.
+See [this pull request](https://github.com/arvydas/blinkstick-node/pull/17) for
+details._
+
 1. Install pWinStatusBlinkStick via NPM.
   
   `npm install pwinstatusblinkstick`
