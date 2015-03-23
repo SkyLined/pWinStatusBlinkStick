@@ -95,9 +95,9 @@ var bBlinkStickMode1 =            oArguments.dbSwitches["mode-inverse"];
 var bBlinkStickMode2 =            oArguments.dbSwitches["mode-multi-led"];
 var bBlinkStickDualLed =          oArguments.dbSwitches["dual-led"];
 var bBlinkStickShowSerials =      oArguments.dbSwitches["show-serials"];
-var asBlinkStickSerialNumbers =   oArguments.dxParameters["serial-numbers"];
 var uBlinkStickUpdateInterval =   oArguments.dxOptions["frame-rate"];
 var nNightTimeBrightness =        oArguments.dxOptions["night-time-brightness"];
+var asBlinkStickSerialNumbers =   oArguments.dxParameters["serial-numbers"];
 // --- Gather CPU usage data ---------------------------------------------------
 var cWinPerfCounter = require("cWinPerfCounter"),
     oPerfCounter = new cWinPerfCounter("\\Processor(_Total)\\% Processor Time");
@@ -186,28 +186,21 @@ setInterval(function () {
 // --- Update BlinkStick colors ------------------------------------------------
 var mColor = require("mColor"),
     cBlinkSticksCollection = require("./cBlinkSticksCollection.js"),
-    oBlinkSticksCollection = new cBlinkSticksCollection();
-if (oBlinkSticksCollection.aoBlinkSticks.length == 0) {
-  console.log("Cannot find any BlinkSticks");
-  process.exit(1);
-};
-
+    oBlinkSticksCollection = undefined;
 var nLastBlinkStickTime, nHeartBeatCounter;
-oBlinkSticksCollection.fGetSerialNumbers(fAfterGetBlinkSticksSerialNumbers);
-function fAfterGetBlinkSticksSerialNumbers() {
-  // If needed, use only selected BlinkSticks based on serial number
-  if (asBlinkStickSerialNumbers) {
-    oBlinkSticksCollection.fSelectSerialNumbers(asBlinkStickSerialNumbers);
-    asBlinkStickSerialNumbers.forEach(function (sSelectedSerialNumber) {
-      if (oBlinkSticksCollection.asSerialNumbers.indexOf(sSelectedSerialNumber) == -1) {
-        console.log("Cannot find BlinkStick with serial number \"" + sSelectedSerialNumber + "\"");
-        process.exit(1);
-      }
-    });
-  };
+if (asBlinkStickSerialNumbers) {
+  cBlinkSticksCollection.fCreateForSerialNumbers(asBlinkStickSerialNumbers, fBlinkSticksCollectionCreatedCallback);
+} else {
+  cBlinkSticksCollection.fCreateForAll(fBlinkSticksCollectionCreatedCallback);
+}
+function fBlinkSticksCollectionCreatedCallback(oError, _oBlinkSticksCollection) {
+  oBlinkSticksCollection = _oBlinkSticksCollection;
   // If needed, show the serial numbers of (selected) BlinkSticks
   if (bBlinkStickShowSerials) {
-    console.log("Serial numbers: \"" + oBlinkSticksCollection.asSerialNumbers.join("\", \"") + "\"");
+    var asSerialNumbersJSON = oBlinkSticksCollection.aoBlinkSticks.map(function (oBlinkStick) {
+      return JSON.stringify(oBlinkStick.sSerialNumber);
+    });
+    console.log("Serial numbers: " + asSerialNumbersJSON.join(", ") + "");
   };
   // If needed, switch the mode of the (selected) BlinkSticks
   var uSwitchToMode = (
@@ -216,13 +209,15 @@ function fAfterGetBlinkSticksSerialNumbers() {
     bBlinkStickMode2 ? 2 :
     undefined
   );  
-  if (uSwitchToMode === undefined) {
-    oBlinkSticksCollection.fGetModes(fAfterGetOrSwitchBlinkSticksMode);
+  if (uSwitchToMode !== undefined) {
+    oBlinkSticksCollection.fSwitchModes(uSwitchToMode, function () {
+      fBlinkSticksModeSwitchedCallback();
+    });
   } else {
-    oBlinkSticksCollection.fSwitchModes(uSwitchToMode, fAfterGetOrSwitchBlinkSticksMode);
+    fBlinkSticksModeSwitchedCallback();
   }
 }
-function fAfterGetOrSwitchBlinkSticksMode() {
+function fBlinkSticksModeSwitchedCallback() {
   nLastBlinkStickTime = new Date().valueOf();
   nHeartBeatCounter = 0;
   var oBlack = mColor.cRGBA("black");
@@ -275,8 +270,8 @@ function fUpdateBlinkSticks() {
   nNetworkLuminosity *= nNightTimeBrightnessAdjustment; // night-time adjustment
   var oNetworkColorHSLA = new mColor.cHSLA(nNetworkHue, 1, nNetworkLuminosity);
   bColorConsoleOutput;// &&
-  console.log("nNetworkLatency = " + nNetworkLatency + ", nNetworkHue = " + nNetworkHue + ", nNetworkLuminosity = " + 
-      nNetworkLuminosity + ", color: " + oNetworkColorHSLA.sRGB);
+  bNetConsoleOutput && console.log("nNetworkLatency = " + nNetworkLatency + ", nNetworkHue = " + nNetworkHue + 
+      ", nNetworkLuminosity = " +  nNetworkLuminosity + ", color: " + oNetworkColorHSLA.sRGB);
   
   // Single color: Blue overlays the CPU usage color with higher network latency (through opacity)
   var nBlueOpacity = 0.8 * (nNetworkLatency === undefined ? 1 : nNetworkLatency * nNetworkLatency);
