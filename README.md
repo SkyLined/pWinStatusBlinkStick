@@ -72,8 +72,8 @@ Switches:
         Use WS2812 mode for multiple LEDs attached to a BlinkStick Pro
     --mode-normal
         Use normal mode for single LED attached to BlinkStick/BlinkStick Pro
-    --show-serials
-        Output the serial numbers of all selected BlinkSticks
+    --show-blinksticks
+        Output the serial numbers and modes of all selected BlinkSticks
 ```
 
 Notes

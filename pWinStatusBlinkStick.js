@@ -29,8 +29,8 @@ var oArguments = foParseArguments({
       "sHelpText": "Show CPU usage and Network latency on alternating LEDs (requires WS2812 mode)",
       "asExcludesSwitches": ["mode-normal", "mode-inverse"],
     },
-    "show-serials": {
-      "sHelpText": "Output the serial numbers of all selected BlinkSticks",
+    "show-blinksticks": {
+      "sHelpText": "Output the serial numbers and modes of all selected BlinkSticks",
     },
   },
   "dxOptions": {
@@ -94,7 +94,7 @@ var bBlinkStickMode0 =            oArguments.dbSwitches["mode-normal"];
 var bBlinkStickMode1 =            oArguments.dbSwitches["mode-inverse"];
 var bBlinkStickMode2 =            oArguments.dbSwitches["mode-multi-led"];
 var bBlinkStickDualLed =          oArguments.dbSwitches["dual-led"];
-var bBlinkStickShowSerials =      oArguments.dbSwitches["show-serials"];
+var bBlinkStickShowDetails =      oArguments.dbSwitches["show-blinksticks"];
 var uBlinkStickUpdateInterval =   oArguments.dxOptions["frame-rate"];
 var nNightTimeBrightness =        oArguments.dxOptions["night-time-brightness"];
 var asBlinkStickSerialNumbers =   oArguments.dxParameters["serial-numbers"];
@@ -136,13 +136,14 @@ var aoNetSamples = [];
 var uCounter = 0;
 setInterval(function () {
   var uIndex = uCounter++;
-  var nNetStartTime = new Date().valueOf();
+  var nRequestStartTime = new Date().valueOf();
   var uTimeout = setTimeout(function () {
     handleNet(null, null);
   }, nNetTimeout);
   bNetConsoleOutput && console.log("Net: Sending request #" + uIndex + "...");
   oRequest = mHTTP.get(sNetTargetUrl);
   oRequest.on("error", function (oError) {
+    console.log("Cannot request network latency test page:", oError);
     handleNet(oError, null);
   });
   oRequest.on("response", function (oResponse) {
@@ -150,17 +151,17 @@ setInterval(function () {
   });
   function handleNet(oError, oResponse) {
     var uSampleCount = aoNetSamples.length;
+    var nSampleTime = new Date().valueOf();
     aoNetSamples = aoNetSamples.filter(function (oSample) {
-      return oSample.nDateValue >= nNetEndTime - nNetAverageInterval;
+      return oSample.nDateValue >= nSampleTime - nNetAverageInterval;
     });
     var bNetworkLatencyNeedsRecalculation = uSampleCount != aoNetSamples.length;
     if (uTimeout !== null) {
       clearTimeout(uTimeout);
       uTimeout = null;
-      var nNetEndTime = new Date().valueOf();
       if (oResponse) {
         sMessage = "response for #" + uIndex + ": " + oResponse.statusCode;
-        nNetDuration = nNetEndTime - nNetStartTime;
+        nNetDuration = nSampleTime - nRequestStartTime;
         if (nNetDuration < nMinimalNetDuration) {
           nMinimalNetDuration = nNetDuration;
         }
@@ -171,12 +172,16 @@ setInterval(function () {
         sMessage = "timeout for #" + uIndex;
         nNetDuration = nNetTimeout;
       }
-      aoNetSamples.push(new cSample(nNetEndTime, nNetDuration));
+      aoNetSamples.push(new cSample(nSampleTime, nNetDuration));
       bNetworkLatencyNeedsRecalculation = true;
     }
     if (bNetworkLatencyNeedsRecalculation) {
-      nAverageNetDuration = aoNetSamples ? average(aoNetSamples.map(function (oSample) { return oSample.nValue; })) : undefined;
-      nNetworkLatency = (nAverageNetDuration - nMinimalNetDuration) / (nNetTimeout - nMinimalNetDuration);
+      if (aoNetSamples) {
+        nAverageNetDuration = average(aoNetSamples.map(function (oSample) { return oSample.nValue; }));
+        nNetworkLatency = (nAverageNetDuration - nMinimalNetDuration) / (nNetTimeout - nMinimalNetDuration);
+      } else {
+        nNetworkLatency = undefined;
+      }
       bNetConsoleOutput && console.log("Net: " + sMessage + ": " + nNetDuration + " => " + nAverageNetDuration + 
           "/" + nNetTimeout + " => " + nNetworkLatency);
       fUpdateBlinkSticks();
@@ -196,11 +201,10 @@ if (asBlinkStickSerialNumbers) {
 function fBlinkSticksCollectionCreatedCallback(oError, _oBlinkSticksCollection) {
   oBlinkSticksCollection = _oBlinkSticksCollection;
   // If needed, show the serial numbers of (selected) BlinkSticks
-  if (bBlinkStickShowSerials) {
-    var asSerialNumbersJSON = oBlinkSticksCollection.aoBlinkSticks.map(function (oBlinkStick) {
-      return JSON.stringify(oBlinkStick.sSerialNumber);
+  if (bBlinkStickShowDetails) {
+    oBlinkSticksCollection.aoBlinkSticks.forEach(function (oBlinkStick) {
+      console.log("Serial number " + oBlinkStick.sSerialNumber + " is in mode " + oBlinkStick.uMode);
     });
-    console.log("Serial numbers: " + asSerialNumbersJSON.join(", ") + "");
   };
   // If needed, switch the mode of the (selected) BlinkSticks
   var uSwitchToMode = (

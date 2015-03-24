@@ -44,12 +44,15 @@ cBlinkSticksCollection.fCreateForBlinkSticks =
   // callback args: oError, oBlinkSticksCollection
   var uIndex = 0, oLastError = undefined;
   aoBlinkSticks.forEach(function (oBlinkStick) {
-    oBlinkStick.fGetMode(function (oError, uMode) {
+    oBlinkStick.fGetSerialNumber(function (oError, sSerialNumber) {
       if (oError) oLastError = oError;
-      if (++uIndex == aoBlinkSticks.length) {
-        var oBlinkSticksCollection = oLastError ? undefined : new cBlinkSticksCollection(aoBlinkSticks);
-        process.nextTick(function () { fCallback(oLastError, oBlinkSticksCollection); });
-      };
+      oBlinkStick.fGetMode(function (oError, uMode) {
+        if (oError) oLastError = oError;
+        if (++uIndex == aoBlinkSticks.length) {
+          var oBlinkSticksCollection = oLastError ? undefined : new cBlinkSticksCollection(aoBlinkSticks);
+          process.nextTick(function () { fCallback(oLastError, oBlinkSticksCollection); });
+        };
+      });
     });
   });
 }

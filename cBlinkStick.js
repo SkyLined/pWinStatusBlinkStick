@@ -19,7 +19,7 @@ cBlinkStick.prototype.fGetSerialNumber = function cBlinkStick_fGetSerialNumber(f
   } else if (oThis.sSerialNumber !== undefined) {
     bBlinkStickConsoleOutput && console.log("cBlinkStick::fGetSerialNumbers > already finished, serial number = " + 
         oThis.sSerialNumber);
-    process.nextTick(fCallback); // already done
+    process.nextTick(function() { fCallback(undefined, oThis.sSerialNumber); }); // already done
   } else {
     // Add the callback to the list and start getting the serial number
     oThis.bDeviceBusy = true;
@@ -29,7 +29,7 @@ cBlinkStick.prototype.fGetSerialNumber = function cBlinkStick_fGetSerialNumber(f
         if (!oError) {
           oThis.uSequentialErrors = 0;
           oThis.sSerialNumber = sSerialNumber;
-          console.log("cBlinkStick::fGetSerialNumber > finished, serial number = " + sSerialNumber);
+          bBlinkStickConsoleOutput && console.log("cBlinkStick::fGetSerialNumber > finished, serial number = " + sSerialNumber);
         } else if (++oThis.uSequentialErrors < 10) {
           console.warn("cBlinkStick::fGetSerialNumber > error =", oError, "(retrying)");
           return process.nextTick(cBlinkStick_fGetSerialNumber_Helper); // try again
@@ -55,7 +55,7 @@ cBlinkStick.prototype.fSwitchMode = function cBlinkStick_fSwitchMode(uMode, fCal
         if (!oError) {
           oThis.uSequentialErrors = 0;
           oThis.uMode = uMode;
-          console.log("cBlinkStick::fSwitchMode > finished, mode = " + uMode);
+          bBlinkStickConsoleOutput && console.log("cBlinkStick::fSwitchMode > finished, mode = " + uMode);
         } else if (++oThis.uSequentialErrors < 10) {
           console.warn("cBlinkStick::fSwitchMode > error =", oError, "(retrying)");
           return process.nextTick(cBlinkStick_fSwitchMode_Helper); // try again
@@ -81,7 +81,7 @@ cBlinkStick.prototype.fGetMode = function cBlinkStick_fGetMode(fCallback) {
         if (!oError) {
           oThis.uSequentialErrors = 0;
           oThis.uMode = uMode;
-          console.log("cBlinkStick::fGetMode > finished, mode = " + uMode);
+          bBlinkStickConsoleOutput && console.log("cBlinkStick::fGetMode > finished, mode = " + uMode);
         } else if (++oThis.uSequentialErrors < 10) {
           console.warn("cBlinkStick::fGetMode > error =", oError, "(retrying)");
           return process.nextTick(cBlinkStick_fGetMode_Helper); // try again
@@ -112,7 +112,7 @@ cBlinkStick.prototype.fSetColor = function cBlinkStick_fSetColor(oColor, fCallba
       oThis.oBlinkStickDevice.setColor(sRGBValue, function (oError) {
         if (!oError) {
           oThis.uSequentialErrors = 0;
-          console.log("cBlinkStick::fSetColor > finished");
+          bBlinkStickConsoleOutput && console.log("cBlinkStick::fSetColor > finished");
         } else if (++oThis.uSequentialErrors < 10) {
           console.warn("cBlinkStick::fSetColor > error =", oError, "(retrying)");
           return process.nextTick(cBlinkStick_fSetColor_Helper); // try again
@@ -156,7 +156,7 @@ cBlinkStick.prototype.fSetColors = function cBlinkStick_fSetColors(aaoColors, fC
           if (++uChannelIndex < aauGRBValues.length) {
             return process.nextTick(cBlinkStick_fSetColors_Helper); // next channel;
           } else {
-            console.log("cBlinkStick::fSetColors > finished");
+            bBlinkStickConsoleOutput && console.log("cBlinkStick::fSetColors > finished");
           };
         } else if (++oThis.uSequentialErrors < 10) {
           console.warn("cBlinkStick::fSetColors > error =", oError, "(retrying)");
