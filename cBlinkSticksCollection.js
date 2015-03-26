@@ -1,8 +1,9 @@
+module.exports = cBlinkSticksCollection;
+
 var bBlinkStickConsoleOutput = false;
 
 var mBlinkStick = require("BlinkStick"),
     cBlinkStick = require("./cBlinkStick");
-module.exports = cBlinkSticksCollection;
 
 function cBlinkSticksCollection(aoBlinkSticks) {
   if (this.constructor != arguments.callee) return new arguments.callee(aoBlinkSticks);

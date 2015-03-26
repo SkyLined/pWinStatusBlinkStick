@@ -1,7 +1,8 @@
+module.exports = cBlinkStick;
+
 var bBlinkStickConsoleOutput = false;
 
 var mBlinkStick = require("BlinkStick");
-module.exports = cBlinkStick;
 
 function cBlinkStick(oBlinkStickDevice, sSerialNumber) {
   if (this.constructor != arguments.callee) return new arguments.callee();
