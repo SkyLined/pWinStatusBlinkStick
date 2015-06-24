@@ -31,7 +31,7 @@
   "dependencies": {
     "blinkstick": "1.1.1-hid-fixed",
     "cwinperfcounter": "0.0.x",
-    "foparsearguments": "~0.0.12",
+    "foparsearguments": "~0.0.17",
     "mcolor": "~0.0.12"
   },
   "main": "./pWinStatusBlinkStick.js",
